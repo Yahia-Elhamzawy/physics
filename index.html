@@ -5,13 +5,94 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>البحث عن الدرجات</title>
     <style>
-        body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-        input { padding: 10px; margin-right: 10px; }
-        button { padding: 10px 20px; cursor: pointer; }
-        #result { margin-top: 20px; font-size: 1.2em; }
-        ul { list-style-type: none; padding: 0; }
-        li { margin-bottom: 5px; }
-        footer { margin-top: 40px; font-size: 0.9em; color: #888; }
+        body {
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            margin: 50px auto;
+            background-color: #f4f4f4;
+            color: #333;
+            max-width: 800px;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        h1 {
+            color: #0056b3;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        input {
+            padding: 12px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: inset 2px 2px 4px rgba(0,0,0,0.05);
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+        input:focus {
+            border-color: #0056b3;
+        }
+
+        button {
+            padding: 12px 25px;
+            cursor: pointer;
+            background-color: #0056b3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+             display: none;
+        }
+        button:hover {
+            background-color: #004182;
+        }
+        #result {
+            margin-top: 25px;
+            font-size: 1.2em;
+            color: #444;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            margin-bottom: 8px;
+            padding: 8px;
+             background-color: white;
+             border-radius: 5px;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            text-align: right;
+        }
+        footer {
+            margin-top: 50px;
+            font-size: 0.9em;
+            color: #888;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        #suggestions {
+            margin-top: 15px;
+            font-size: 1em;
+            color: #555;
+        }
+        #suggestions ul {
+            padding: 0;
+        }
+        #suggestions li {
+            cursor: pointer;
+            color: #007bff;
+           text-decoration: underline;
+            display: inline;
+            margin-left: 8px;
+            transition: color 0.2s ease;
+        }
+
+        #suggestions li:hover {
+            color: #0056b3;
+        }
     </style>
 </head>
 <body>
@@ -19,9 +100,10 @@
     <input type="text" id="studentName" placeholder="أدخل جزء من اسم الطالب">
     <button onclick="searchGrade()">بحث</button>
     <div id="result"></div>
+    <div id="suggestions"></div>
 
     <footer>
-        <p>حقوق الملكية محفوظة &copy; 2024</p>
+        <p>حقوق الملكية محفوظة © 2024</p>
         <p>By: Yahya El hamzawy</p>
         <p>By: Kareem Ahmed</p>
     </footer>
@@ -394,7 +476,7 @@ student_name,grade
 ميادة مؤمن سید محمود محمد,0
 میاده خالد محمود عبد اللطيف عبد الرازق,30
 ميرنا يحي سعد بشير,28
-ميسره محمد عبدالعزيز العزب شلبي,0
+میسره محمد عبدالعزيز العزب شلبي,0
 مینا اسحاق رمزی مختار,21
 مينا سميح رؤوف كمال,27
 مينا ضياء سيف وهبى مسعد,22
@@ -475,28 +557,112 @@ student_name,grade
 
         const grades = parseCSV(gradesData);
 
-        function searchGrade() {
-            const studentName = document.getElementById("studentName").value;
+        function levenshteinDistance(str1, str2) {
+            const m = str1.length;
+            const n = str2.length;
+            const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+
+            for (let i = 0; i <= m; i++) {
+                dp[i][0] = i;
+            }
+            for (let j = 0; j <= n; j++) {
+                dp[0][j] = j;
+            }
+
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    if (str1[i - 1] === str2[j - 1]) {
+                        dp[i][j] = dp[i - 1][j - 1];
+                    } else {
+                        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+                    }
+                }
+            }
+            return dp[m][n];
+        }
+
+        function getGradeEmoji(grade) {
+            if (grade >= 27) return '🌟';
+            if (grade >= 24) return '🏆';
+            if (grade >= 21) return '✅';
+            if (grade >= 18) return '👍';
+            return '🙁';
+        }
+
+
+       function searchGrade(name) {
+           const studentName = name || document.getElementById("studentName").value;
             const resultDiv = document.getElementById("result");
-            resultDiv.innerHTML = "";  // Clear previous results
+            const suggestionsDiv = document.getElementById("suggestions");
+            resultDiv.innerHTML = "";
+            suggestionsDiv.innerHTML = "";
             const trimmedStudentName = studentName.trim();
+             const searchWords = trimmedStudentName.split(" ");
 
-            const foundStudents = grades.filter(student =>
-               student.student_name.trim().includes(trimmedStudentName)
-            );
+           let foundStudents;
 
-            if (foundStudents.length > 0) {
+
+             if(searchWords.length === 1){
+                 foundStudents = grades.filter(student =>
+                    student.student_name.trim().includes(trimmedStudentName)
+                );
+
+            } else{
+                foundStudents = grades.filter(student => {
+                    const studentName = student.student_name.trim();
+                    const studentWords = studentName.split(" ");
+                     if(studentWords.length >= searchWords.length){
+                        for(let i=0; i< searchWords.length;i++){
+                           if(studentWords[i] !== searchWords[i]) return false;
+                            }
+                         return true;
+                       } else return false;
+
+                 });
+            }
+
+
+             if (foundStudents.length > 0) {
                 const ul = document.createElement('ul');
                 foundStudents.forEach(student => {
                     const li = document.createElement('li');
-                    li.textContent = `اسم الطالب: ${student.student_name}، الدرجة: ${student.grade}`;
+                    const emoji = getGradeEmoji(parseInt(student.grade));
+                    li.textContent = `اسم الطالب: ${student.student_name}، الدرجة: ${student.grade} ${emoji}`;
                     ul.appendChild(li);
                 });
                 resultDiv.appendChild(ul);
-            } else {
-                resultDiv.textContent = "لم يتم العثور على أي طالب بهذا الاسم.";
+            }  else {
+              resultDiv.textContent = "لم يتم العثور على أي طالب بهذا الاسم.";
+           // Suggest similar names
+            const allNames = grades.map(student => student.student_name.trim());
+            const suggestions = allNames
+                .map(name => ({ name, distance: levenshteinDistance(trimmedStudentName, name) }))
+                .sort((a, b) => a.distance - b.distance)
+                .slice(0, 5);
+            if (suggestions.length > 0 && suggestions[0].distance < 4) {
+                const suggestionsUl = document.createElement('ul');
+                const suggestionsList = document.createElement('span');
+                   suggestionsList.textContent = "هل تقصد: ";
+                   suggestionsUl.appendChild(suggestionsList);
+                suggestions.forEach(suggestion => {
+                   const suggestionLi = document.createElement('li');
+                  suggestionLi.textContent = suggestion.name;
+                    suggestionLi.onclick = () => {
+                         document.getElementById("studentName").value = suggestion.name;
+                         searchGrade(suggestion.name);
+                    };
+                   suggestionsUl.appendChild(suggestionLi);
+                });
+                 suggestionsDiv.appendChild(suggestionsUl);
+             }
             }
         }
+
+
+    const studentNameInput = document.getElementById("studentName");
+        studentNameInput.addEventListener("input",function () {
+          searchGrade();
+        })
     </script>
 </body>
 </html>
